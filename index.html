@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#080d0a">
+  <title>TheStealthGamer</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{--bg:#080d0a;--panel:#111b14;--green:#19e66b;--muted:#a8b5ab;--line:#294633}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:#f4fff6;font-family:Arial,Helvetica,sans-serif;line-height:1.5}
+    header{padding:22px 16px;text-align:center;background:linear-gradient(135deg,#12251a,#0b120d);border-bottom:1px solid var(--green)}
+    header h1{color:var(--green);font-size:clamp(24px,5vw,36px);letter-spacing:1.5px}
+    header p{color:var(--muted);font-size:13px;letter-spacing:2px}
+    nav{display:flex;justify-content:center;gap:22px;flex-wrap:wrap;padding:16px}
+    nav a{color:var(--green);text-decoration:none;font-weight:bold}
+    nav a:hover{color:white}
+    .hero{text-align:center;padding:65px 16px;background:radial-gradient(ellipse at top,#163622 0%,#080d0a 68%)}
+    .hero h2{font-size:clamp(30px,7vw,48px);color:var(--green);margin-bottom:10px}
+    .hero p{color:var(--muted);margin-bottom:22px}
+    .wrap{max-width:1050px;margin:auto;padding:18px}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;margin:0 0 20px;box-shadow:0 12px 35px #0005}
+    .panel h2{margin-bottom:12px}
+    .muted{color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:15px;margin-top:16px}
+    .game{background:#17251b;border:1px solid var(--line);border-radius:13px;padding:16px;min-width:0}
+    .game h3{color:var(--green);margin-bottom:7px;overflow-wrap:anywhere}
+    .game img{width:100%;height:145px;object-fit:cover;border-radius:9px;margin-bottom:10px;background:#0a100c}
+    input{width:100%;padding:13px;margin:7px 0;background:#080d0a;color:white;border:1px solid #34513b;border-radius:9px;font-size:15px}
+    button,.button{display:inline-block;background:var(--green);color:#061009;border:0;padding:12px 18px;border-radius:9px;font-weight:bold;cursor:pointer;text-decoration:none;margin:5px 4px 5px 0}
+    button:hover,.button:hover{filter:brightness(1.12)}
+    button.secondary{background:#26392c;color:#eaffef;border:1px solid #42634a}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    #message{margin-top:12px;overflow-wrap:anywhere;color:var(--green);min-height:24px}
+    .status{font-size:13px;color:var(--muted);margin-top:8px}
+    footer{text-align:center;padding:28px 15px;color:#849087}
+    [hidden]{display:none!important}
+    @media(max-width:480px){.panel{padding:17px}.hero{padding:48px 14px}nav{gap:14px}}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>THE STEALTH GAMER</h1>
+    <p>YOUR ULTIMATE GAMING ZONE</p>
+  </header>
+
+  <nav>
+    <a href="#home">Home</a>
+    <a href="#games">Games</a>
+    <a href="#account">Account</a>
+  </nav>
+
+  <section class="hero" id="home">
+    <h2>WELCOME GAMER</h2>
+    <p>Discover games, apps and more.</p>
+    <a class="button" href="#games">EXPLORE GAMES</a>
+  </section>
+
+  <main class="wrap">
+    <section class="panel" id="games">
+      <h2>🎮 Games Library</h2>
+      <p class="muted">Published games from TheStealthGamer will appear here.</p>
+      <div class="grid" id="gameList">
+        <p class="muted">Add your Supabase details below to load games.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="account">
+      <h2>🔐 Account</h2>
+      <div id="authForm">
+        <input id="email" type="email" placeholder="Email address" autocomplete="email">
+        <input id="password" type="password" placeholder="Password (minimum 6 characters)" autocomplete="current-password">
+        <button id="signupBtn" type="button">Create account</button>
+        <button id="loginBtn" type="button" class="secondary">Login</button>
+      </div>
+      <div id="userArea" hidden>
+        <p id="userEmail"></p>
+        <button id="logoutBtn" type="button" class="secondary">Logout</button>
+      </div>
+      <p id="message" role="status" aria-live="polite"></p>
+      <p class="status">Email confirmation may be required depending on your Supabase settings.</p>
+    </section>
+  </main>
+
+  <footer>© 2026 TheStealthGamer. All rights reserved.</footer>
+
+  <script>
+    /*
+      STEP 1: Replace ONLY these two placeholder values.
+      Use your Supabase Project URL and Publishable key.
+      Never put a Secret/service_role key in this public website.
+    */
+    const SUPABASE_URL = "https://mesqkndafcdjmceatgsb.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_CRFwO67UdenbOgoz5QD45Q_B_2PxkIK";
+
+    const messageEl = document.getElementById("message");
+    const gameList = document.getElementById("gameList");
+    let supabaseClient = null;
+
+    function showMessage(message, isError = false) {
+      messageEl.textContent = message;
+      messageEl.style.color = isError ? "#ff9b9b" : "#19e66b";
+    }
+
+    function isConfigured() {
+      return SUPABASE_URL.startsWith("https://")
+        && !SUPABASE_URL.includes("PASTE_")
+        && SUPABASE_KEY.length > 20
+        && !SUPABASE_KEY.includes("PASTE_");
+    }
+
+    async function refreshAccount() {
+      if (!supabaseClient) return;
+      const { data, error } = await supabaseClient.auth.getUser();
+      const user = error ? null : data.user;
+      document.getElementById("authForm").hidden = !!user;
+      document.getElementById("userArea").hidden = !user;
+      document.getElementById("userEmail").textContent =
+        user ? "Logged in as: " + user.email : "";
+    }
+
+    async function signUp() {
+      if (!supabaseClient) return showMessage("Add your Supabase URL and Publishable key first.", true);
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      if (!email || !password) return showMessage("Enter your email and password.", true);
+      if (password.length < 6) return showMessage("Password must be at least 6 characters.", true);
+
+      const { error } = await supabaseClient.auth.signUp({ email, password });
+      if (error) return showMessage(error.message, true);
+      showMessage("Signup submitted. Check your email if confirmation is enabled.");
+      await refreshAccount();
+    }
+
+    async function signIn() {
+      if (!supabaseClient) return showMessage("Add your Supabase URL and Publishable key first.", true);
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      if (!email || !password) return showMessage("Enter your email and password.", true);
+
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) return showMessage(error.message, true);
+      showMessage("Login successful.");
+      await refreshAccount();
+    }
+
+    async function signOut() {
+      if (!supabaseClient) return;
+      const { error } = await supabaseClient.auth.signOut();
+      if (error) return showMessage(error.message, true);
+      showMessage("You are logged out.");
+      await refreshAccount();
+    }
+
+    async function loadGames() {
+      if (!supabaseClient) return;
+      const { data, error } = await supabaseClient
+        .from("games")
+        .select("id,title,description,image_url,download_url,platform")
+        .eq("status", "published")
+        .order("title", { ascending: true });
+
+      if (error) {
+        gameList.textContent = "Games could not be loaded yet. Check your database policies.";
+        return;
+      }
+      gameList.replaceChildren();
+      if (!data || data.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "muted";
+        empty.textContent = "No published games yet.";
+        gameList.appendChild(empty);
+        return;
+      }
+
+      data.forEach(game => {
+        const card = document.createElement("article");
+        card.className = "game";
+        if (game.image_url) {
+          const img = document.createElement("img");
+          img.src = game.image_url;
+          img.alt = game.title || "Game image";
+          img.loading = "lazy";
+          card.appendChild(img);
+        }
+        const title = document.createElement("h3");
+        title.textContent = game.title || "Untitled game";
+        card.appendChild(title);
+        const desc = document.createElement("p");
+        desc.className = "muted";
+        desc.textContent = game.description || "";
+        card.appendChild(desc);
+        if (game.platform) {
+          const platform = document.createElement("p");
+          platform.className = "status";
+          platform.textContent = "Platform: " + game.platform;
+          card.appendChild(platform);
+        }
+        if (game.download_url) {
+          const link = document.createElement("a");
+          link.className = "button";
+          link.href = game.download_url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = "Download";
+          card.appendChild(link);
+        }
+        gameList.appendChild(card);
+      });
+    }
+
+    document.getElementById("signupBtn").addEventListener("click", signUp);
+    document.getElementById("loginBtn").addEventListener("click", signIn);
+    document.getElementById("logoutBtn").addEventListener("click", signOut);
+
+    if (isConfigured() && window.supabase) {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      refreshAccount();
+      loadGames();
+      supabaseClient.auth.onAuthStateChange(() => refreshAccount());
+    } else {
+      showMessage("Paste your Supabase Project URL and Publishable key in the two marked lines.");
+      gameList.innerHTML = '<p class="muted">Connect Supabase to load published games.</p>';
+    }
+  </script>
+</body>
+</html>
